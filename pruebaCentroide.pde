@@ -29,11 +29,11 @@ GestorSenial gestorAmpDialogo;
 GestorSenial gestorAmpAplauso;
 
 boolean monitorear = false;
-boolean haySonido;
+
 boolean antesHabiaSonido;
 
 float DIALOGO_UMBRAL = 0.05; //0.05
-float DIALOGO_DURACION = 10000; //3000
+float DIALOGO_DURACION = 3000; //3000
 
 float APLAUSO_UMBRAL = 0.15; //0.15
 int APLAUSO_COOLDOWN = 0; //300
@@ -71,7 +71,8 @@ void setup() {
   size(640, 480);
 
   iniciarSeniales();
-  iniciarAudio();
+  iniciarMic2();
+  iniciarMic1();
   iniciarFisica();
   iniciarCamara();
   iniciarOpenCV();
@@ -88,13 +89,13 @@ void setup() {
 void draw() {
   background(0);
   
-  haySonido = gestorAmpDialogo.filtrada > AMP_MIN_Dialogo;
+  hayDialogo = gestorAmpDialogo.filtrada > AMP_MIN_Dialogo;
 
-  boolean inicioElSonido = haySonido && !antesHabiaSonido;
-  boolean finDelSonido = !haySonido && antesHabiaSonido;
+  boolean inicioElSonido = hayDialogo && !antesHabiaSonido;
+  boolean finDelSonido = !hayDialogo && antesHabiaSonido;
 
   if (inicioElSonido) println("Inicio de sonido detectado");
-  if (finDelSonido) println("Fin de sonido detectado");
+  //if (finDelSonido) println("Fin de sonido detectado");
 
   detectarDialogo();
   detectarAplauso();
@@ -112,17 +113,25 @@ void iniciarSeniales() {
   gestorAmpAplauso = new GestorSenial(AMP_MIN_Aplauso, AMP_MAX_Aplauso);
 }
 
-void iniciarAudio() {
+void iniciarMic1() {
   // Configurar entradas de audio
   micDialogo = new AudioIn(this, 0); // Primer micrófono
-  micAplauso = new AudioIn(this, 1); // Segundo micrófono
   micDialogo.start();
-  micAplauso.start();
+
 
   // Amplitud para detectar niveles de audio
   ampDialogo = new Amplitude(this);
   ampDialogo.input(micDialogo);
 
+
+}
+void iniciarMic2() {
+  // Configurar entradas de audio
+ 
+  micAplauso = new AudioIn(this, 1); // Segundo micrófono
+  micAplauso.start();
+
+  // Amplitud para detectar niveles de audio
   ampAplauso = new Amplitude(this);
   ampAplauso.input(micAplauso);
 
@@ -167,11 +176,23 @@ void iniciarOndaExpansiva() {
 
 // ---- Funciones de procesamiento ----
 void detectarDialogo() {
-  float nivel = ampDialogo.analyze();
-  if (nivel > DIALOGO_UMBRAL) {
-    println("Diálogo detectado: nivel = " + nivel);
+  float nivel = ampDialogo.analyze(); // Analiza la amplitud del micrófono
+  
+  if (nivel > DIALOGO_UMBRAL) { // Si supera el umbral
+ // println("dialogo detectado: nivel = "+ nivel);
+    if (!hayDialogo) { // Si no hay diálogo previo detectado
+      dialogoInicio = millis(); // Registra el inicio del diálogo
+      hayDialogo = true;
+    }
+  } else if (hayDialogo && (millis() - dialogoInicio >= DIALOGO_DURACION)) {
+    println("Hay diálogo"); // Acción cuando se detecta un diálogo válido
+; // Rebobina el sonido de abucheo
+    abucheo.play(); // Reproduce el sonido
+    crearPelotitas(); // Llama a la función para crear una bola (o el equivalente)
+    hayDialogo = false; // Resetea el estado del diálogo
   }
 }
+
 
 void detectarAplauso() {
   float nivel = ampAplauso.analyze();
@@ -190,7 +211,7 @@ void monitorearSenales() {
     gestorAmpAplauso.dibujar(225, 25);
   }
 
-  antesHabiaSonido = haySonido;
+  antesHabiaSonido = hayDialogo;
 }
 
 void procesarCamara() {
@@ -228,7 +249,7 @@ void dibujarOndaExpansiva() {
   } else {
   strokeWeight(0);
   }
-  println (ondaExpansiva.getSize());
+  // println (ondaExpansiva.getSize());
   noFill();
   ellipse(ondaExpansiva.getX(), ondaExpansiva.getY(), ondaExpansiva.getSize(), ondaExpansiva.getSize());
 }
